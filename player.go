@@ -1,34 +1,71 @@
 package main
 
 import (
-	"fmt"
 	"github.com/veandco/go-sdl2/sdl"
+	"math"
+	"time"
+)
+
+const (
+	playerSpeed        = 0.5
+	plaserSize         = 105
+	playerShotCooldown = time.Millisecond * 250
 )
 
 type player struct {
-	tex *sdl.Texture
+	tex  *sdl.Texture
+	x, y float64
+
+	lastShot time.Time
 }
 
-func newPlayer(renderer *sdl.Renderer) (p player, err error) {
-	img, err := sdl.LoadBMP("sprites/player.bmp")
-	if err != nil {
-		return player{}, fmt.Errorf("Loading player sprite: %v", err)
-	}
+func newPlayer(renderer *sdl.Renderer) (p player) {
+	p.tex = textureFromBMP(renderer, "sprites/player.bmp")
+	p.x = screenWidth / 2.0
+	p.y = screenHeight - plaserSize/2.0
 
-	defer img.Free()
-
-	p.tex, err = renderer.CreateTextureFromSurface(img)
-	if err != nil {
-		return player{}, fmt.Errorf("Creating player texture: %v", err)
-	}
-
-	return p, nil
+	return p
 }
 
-func (p *player) draw(renderer *sdl.Renderer)  {
-	renderer.Copy(
+func (p *player) draw(renderer *sdl.Renderer) {
+	x := p.x - plaserSize/2.0
+	y := p.y - plaserSize/2.0
+
+	_ = renderer.Copy(
 		p.tex,
-		&sdl.Rect{X: 0, Y: 0, W: 105, H: 105},
-		&sdl.Rect{X: 50, Y: 0, W: 105, H: 105},
+		&sdl.Rect{X: 0, Y: 0, W: plaserSize, H: plaserSize},
+		&sdl.Rect{X: int32(x), Y: int32(y), W: plaserSize, H: plaserSize},
 	)
+}
+
+func (p *player) update() {
+	keys := sdl.GetKeyboardState()
+
+	if keys[sdl.SCANCODE_LEFT] == 1 {
+		if p.x-(plaserSize/2.0) > 0 {
+			p.x -= playerSpeed
+		}
+	} else if keys[sdl.SCANCODE_RIGHT] == 1 {
+		if p.x+(plaserSize/2.0) < screenWidth {
+			p.x += playerSpeed
+		}
+	}
+
+	if keys[sdl.SCANCODE_SPACE] == 1 {
+		if time.Since(p.lastShot) >= playerShotCooldown {
+			p.shoot(p.x+25, p.y-20)
+			p.shoot(p.x-25, p.y-20)
+		}
+	}
+}
+
+func (p *player) shoot(x, y float64) {
+	if bul, ok := bulletFromPool(); ok {
+		bul.active = true
+		bul.x = x
+		bul.y = y
+		bul.angle = 270 * (math.Pi / 180)
+
+		p.lastShot = time.Now()
+	}
 }
